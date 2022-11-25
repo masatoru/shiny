@@ -1,9 +1,10 @@
 ﻿using System;
+
 namespace Shiny.Jobs;
 
 
 public record JobRunResult(
-    JobInfo? Job, 
+    IJob Job, 
     Exception? Exception
 )
 {

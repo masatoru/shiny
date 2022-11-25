@@ -1,135 +1,104 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Android.Content;
+using Android.OS;
 using AndroidX.Work;
 using Microsoft.Extensions.Logging;
-using Shiny.Stores;
-using P = Android.Manifest.Permission;
+using Shiny.Jobs.Infrastructure;
 
 namespace Shiny.Jobs;
 
 
-public class JobManager : AbstractJobManager
+public class JobManager : IJobManager, IShinyStartupTask
 {
+    readonly ILogger logger;
     readonly AndroidPlatform platform;
+    readonly JobExecutor jobExecutor;
 
 
     public JobManager(
+        ILogger<IJobManager> logger,
         AndroidPlatform platform,
-        IServiceProvider container,
-        IRepository<JobInfo> repository,
-        ILogger<IJobManager> logger
-    )
-    : base(
-        container,
-        repository,
-        logger
+        JobExecutor jobExecutor
     )
     {
+        this.logger = logger;
         this.platform = platform;
+        this.jobExecutor = jobExecutor;
     }
 
-
-    public override Task<AccessState> RequestAccess() => Task.FromResult(AccessState.Available);
-
-
-    public override async void RunTask(string taskName, Func<CancellationToken, Task> task)
+    public void Start()
     {
-        // TODO: I could run this through unique job work
-        if (!this.platform.IsInManifest(P.WakeLock))
+        // TODO: register native jobs based on what's in DI?
+    }
+
+    protected WorkManager Instance => WorkManager.GetInstance(this.platform.AppContext);
+
+    public Task<IEnumerable<JobRunResult>> RunJobs(CancellationToken cancelToken = default, bool runSequentially = false)
+        => this.jobExecutor.RunAll(cancelToken, runSequentially);
+
+
+    public async void RunTask(string taskName, Func<CancellationToken, Task> task)
+    {
+        try
         {
-            base.RunTask(taskName, task);
-        }
-        else
-        {
+            using var pm = this.platform.GetSystemService<PowerManager>(Context.PowerService);
+            using var wakeLock = pm.NewWakeLock(WakeLockFlags.Partial, taskName);
+            if (wakeLock == null)
+                throw new InvalidOperationException("Unable to acquire a wakelock for task");
+
             try
             {
-                using var pm = this.platform.GetSystemService<Android.OS.PowerManager>(Context.PowerService);
-                using var wakeLock = pm.NewWakeLock(Android.OS.WakeLockFlags.Partial, "ShinyTask");
-                try
-                {
-                    wakeLock.Acquire();
-                    await task(CancellationToken.None).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    this.Log.LogError(ex, "Error running task - " + taskName);
-                }
-                finally
-                {
-                    wakeLock.Release();
-                }
+                wakeLock.Acquire();
+                await task(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                this.Log.LogError(ex, "Error setting up task - " + taskName);
+                this.logger.LogError(ex, "Error running task");
             }
+            finally
+            {
+                wakeLock.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            this.logger.LogError(ex, "Error setting up task");
         }
     }
 
+    
 
-    protected override void RegisterNative(JobInfo jobInfo)
+    protected void RegisterNative()
     {
-        this.CancelNative(jobInfo);
+        //this.Instance.CancelUniqueWork(jobInfo.Identifier);
 
-        //WorkManager.Initialize(this.context.AppContext, new Configuration())
         var constraints = new Constraints.Builder()
-            .SetRequiresBatteryNotLow(jobInfo.BatteryNotLow)
-            .SetRequiresCharging(jobInfo.DeviceCharging)
-            .SetRequiredNetworkType(ToNative(jobInfo.RequiredInternetAccess))
+            //.SetRequiresBatteryNotLow(jobInfo.BatteryNotLow)
+            //.SetRequiresCharging(jobInfo.DeviceCharging)
+            //.SetRequiredNetworkType(ToNative(jobInfo.RequiredInternetAccess))
             .Build();
 
         var data = new Data.Builder();
-        data.PutString(ShinyJobWorker.ShinyJobIdentifier, jobInfo.Identifier);
+        var request = new PeriodicWorkRequest.Builder(typeof(ShinyJobWorker), TimeSpan.FromMinutes(15))
+           .SetConstraints(constraints)
+           .SetInputData(data.Build())
+           .Build();
 
-        if (jobInfo.Repeat)
-        {
-            var request = new PeriodicWorkRequest.Builder(typeof(ShinyJobWorker), TimeSpan.FromMinutes(15))
-                .SetConstraints(constraints)
-                .SetInputData(data.Build())
-                .Build();
-
-            this.Instance.EnqueueUniquePeriodicWork(
-                jobInfo.Identifier,
-                ExistingPeriodicWorkPolicy.Replace,
-                request
-            );
-        }
-        else
-        {
-            var worker = new OneTimeWorkRequest.Builder(typeof(ShinyJobWorker))
-                .SetInputData(data.Build())
-                .SetConstraints(constraints)
-                .Build();
-
-            this.Instance.EnqueueUniqueWork(
-                jobInfo.Identifier,
-                ExistingWorkPolicy.Append,
-                worker
-            );
-        }
+        this.Instance.EnqueueUniquePeriodicWork(
+            "TASK NAME",
+            ExistingPeriodicWorkPolicy.Replace,
+            request
+        );
     }
 
 
-    static NetworkType ToNative(InternetAccess access) => access switch
-    {
-        InternetAccess.Any => NetworkType.Connected,
-        InternetAccess.Unmetered => NetworkType.Unmetered,
-        _ => NetworkType.NotRequired
-    };
-
-
-    protected override void CancelNative(JobInfo jobInfo)
-        => this.Instance.CancelUniqueWork(jobInfo.Identifier);
-
-
-    public override async Task CancelAll()
-    {
-        await base.CancelAll().ConfigureAwait(false);
-        this.Instance.CancelAllWork();
-    }
-
-
-    WorkManager Instance => WorkManager.GetInstance(this.platform.AppContext);
+    //static NetworkType ToNative(InternetAccess access) => access switch
+    //{
+    //    InternetAccess.Any => NetworkType.Connected,
+    //    InternetAccess.Unmetered => NetworkType.Unmetered,
+    //    _ => NetworkType.NotRequired
+    //};
 }
