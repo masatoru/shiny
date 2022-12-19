@@ -1,46 +1,64 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.ComponentModel;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Shiny.BluetoothLE;
 
 
-public interface IGattCharacteristic
+public interface IGattCharacteristic : INotifyPropertyChanged
 {
-    IGattService Service { get; }
     string Uuid { get; }
+
+    /// <summary>
+    /// 
+    /// </summary>
     bool IsNotifying { get; }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    byte[] Value { get; }
+
+    /// <summary>
+    /// 
+    /// </summary>
     CharacteristicProperties Properties { get; }
 
     /// <summary>
-    /// Subscribe to notifications (or indications if available) - once all subscriptions are cleared, the characteristic is unsubscribed
+    /// 
     /// </summary>
-    /// <param name="enable"></param>
-    /// <param name="useIndicationIfAvailable">If true and indication is available, it will be used</param>
-    /// <returns></returns>
-    IObservable<IGattCharacteristic> EnableNotifications(bool enable, bool useIndicationIfAvailable = false);
+    IList<IGattDescriptor>? Descriptors { get; }
 
-    ///// <summary>
-    ///// Subscribe to notifications (or indications if available) - once all subscriptions are cleared, the characteristic is unsubscribed
-    ///// </summary>
-    ///// <returns></returns>
-    IObservable<GattCharacteristicResult> WhenNotificationReceived();
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="useIndicationsIfAvailable"></param>
+    /// <returns></returns>
+    Task StartNotifications(bool useIndicationsIfAvailable = true);
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <returns></returns>
+    Task StopNotifications();
 
     /// <summary>
     /// Discovers descriptors for this characteristic
     /// </summary>
     /// <returns></returns>
-    IObservable<IList<IGattDescriptor>> GetDescriptors();
+    Task<IList<IGattDescriptor>> GetDescriptors();
 
     /// <summary>
     /// Writes the value to the remote characteristic
     /// </summary>
     /// <param name="value">The bytes to send</param>
     /// <param name="withResponse">Write with or without response</param>
-    IObservable<GattCharacteristicResult> Write(byte[] value, bool withResponse = true);
+    Task Write(byte[] value, bool withResponse = true, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Read characteristic remote value
     /// </summary>
     /// <returns></returns>
-    IObservable<GattCharacteristicResult> Read();
+    Task<byte[]> Read(CancellationToken cancellationToken = default);
 }

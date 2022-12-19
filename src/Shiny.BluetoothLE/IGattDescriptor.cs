@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace Shiny.BluetoothLE;
 
@@ -7,6 +8,7 @@ public interface IGattDescriptor
 {
     IGattCharacteristic Characteristic { get; }
     string Uuid { get; }
-    IObservable<GattDescriptorResult> Write(byte[] data);
-    IObservable<GattDescriptorResult> Read();
+
+    Task Write(byte[] data, CancellationToken cancellationToken = default);
+    Task<byte[]> Read(CancellationToken cancellationToken = default);
 }

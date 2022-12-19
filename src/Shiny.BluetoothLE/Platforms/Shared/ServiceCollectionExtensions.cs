@@ -1,6 +1,4 @@
-﻿
-using System;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Shiny.BluetoothLE;
 
@@ -17,21 +15,17 @@ public static class ServiceCollectionExtensions
     /// <param name="delegateType"></param>
     /// <returns></returns>
 #if APPLE
-    public static IServiceCollection AddBluetoothLE(this IServiceCollection services, Type? delegateType = null, AppleBleConfiguration? config = null)
+    public static IServiceCollection AddBluetoothLE(this IServiceCollection services, AppleBleConfiguration? config = null)
     {
         services.TryAddSingleton(config ?? new AppleBleConfiguration());
 #elif ANDROID
-    public static IServiceCollection AddBluetoothLE(this IServiceCollection services, Type? delegateType = null, AndroidBleConfiguration? config = null)
+    public static IServiceCollection AddBluetoothLE(this IServiceCollection services, AndroidBleConfiguration? config = null)
     {
+        // TODO: error if there is an existing config and null isn't coming in?
         services.TryAddSingleton(config ?? new AndroidBleConfiguration());
 #endif
-        if (!services.HasImplementation<Shiny.BluetoothLE.Internals.ManagerContext>())
-        {
-            services.AddShinyService<Shiny.BluetoothLE.Internals.ManagerContext>();
+        if (!services.HasService<IBleManager>())
             services.AddShinyService<BleManager>();
-        }
-        if (delegateType != null)
-            services.AddShinyService(delegateType);
 
         return services;
     }
@@ -45,11 +39,12 @@ public static class ServiceCollectionExtensions
     /// <param name="config"></param>
     /// <returns></returns>
 #if APPLE
-    public static IServiceCollection AddBluetoothLE<TCentralDelegate>(this IServiceCollection services, AppleBleConfiguration? config = null) where TCentralDelegate : class, IBleDelegate
-        => services.AddBluetoothLE(typeof(TCentralDelegate), config);
-
+    public static IServiceCollection AddBluetoothLE<TDelegate>(this IServiceCollection services, AppleBleConfiguration? config = null) where TDelegate : class, IBleDelegate
 #elif ANDROID
-    public static IServiceCollection AddBluetoothLE<TCentralDelegate>(this IServiceCollection services, AndroidBleConfiguration? config = null) where TCentralDelegate : class, IBleDelegate
-        => services.AddBluetoothLE(typeof(TCentralDelegate), config);
+    public static IServiceCollection AddBluetoothLE<TDelegate>(this IServiceCollection services, AndroidBleConfiguration? config = null) where TDelegate : class, IBleDelegate
 #endif
+    {
+        services.AddSingleton<IBleDelegate, TDelegate>();
+        return services.AddBluetoothLE(config);
+    }
 }
