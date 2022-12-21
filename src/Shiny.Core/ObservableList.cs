@@ -8,6 +8,8 @@ namespace Shiny;
 
 public interface INotifyReadOnlyCollection<T> : INotifyCollectionChanged, IReadOnlyList<T>
 {
+    //list.Dispatcher = action => Host.Current.Services.GetRequiredService<IPlatform>().InvokeOnMainThread(action);
+    Action<Action>? Dispatcher { get; set; }
 }
 
 
@@ -23,6 +25,8 @@ public class ObservableList<T> : ObservableCollection<T>, INotifyCollectionChang
     public ObservableList() { }
     public ObservableList(IEnumerable<T> items) : base(items) { }
 
+    public Action<Action>? Dispatcher { get; set; }
+
 
     /// <summary>
     /// Adds a collection of items and then fires the CollectionChanged event - more performant than doing individual adds
@@ -33,7 +37,7 @@ public class ObservableList<T> : ObservableCollection<T>, INotifyCollectionChang
         foreach (var item in items)
             this.Items.Add(item);
 
-        this.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, items));
+        this.Changed(new(NotifyCollectionChangedAction.Add, items));
     }
 
 
@@ -47,7 +51,16 @@ public class ObservableList<T> : ObservableCollection<T>, INotifyCollectionChang
         foreach (var item in items)
             this.Items.Add(item);
 
-        this.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        this.Changed(new(NotifyCollectionChangedAction.Reset));
+    }
+
+
+    void Changed(NotifyCollectionChangedEventArgs args)
+    {
+        if (this.Dispatcher == null)
+            this.OnCollectionChanged(args);
+        else
+            this.Dispatcher.Invoke(() => this.OnCollectionChanged(args));
     }
 }
 
