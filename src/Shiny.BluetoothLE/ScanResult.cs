@@ -3,7 +3,7 @@
 namespace Shiny.BluetoothLE;
 
 
-public class ScanResult : NotifyPropertyChanged, IAdvertisementData
+public class ScanResult : NotifyPropertyChanged
 {
     public ScanResult(IPeripheral peripheral) => this.Peripheral = peripheral;
 

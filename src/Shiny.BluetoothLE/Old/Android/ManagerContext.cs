@@ -45,32 +45,7 @@
 //    public AndroidPlatform Android { get; }
 //    public ILoggerFactory Logging { get; }
 
-//    public void Start()
-//    {
-//        this.Android.RegisterBroadcastReceiver<ShinyBleBroadcastReceiver>(
-//            BluetoothDevice.ActionNameChanged,
-//            BluetoothDevice.ActionBondStateChanged,
-//            BluetoothDevice.ActionPairingRequest,
-//            BluetoothDevice.ActionAclConnected
-//        );
-//        ShinyBleBroadcastReceiver
-//            .WhenBleEvent()
-//            .Subscribe(intent => this.DeviceEvent(intent));
 
-//        this.Android.RegisterBroadcastReceiver<ShinyBleAdapterStateBroadcastReceiver>(
-//            BluetoothAdapter.ActionStateChanged
-//        );
-
-//        // TODO: convert this to an async func
-//        ShinyBleAdapterStateBroadcastReceiver
-//            .WhenStateChanged()
-//            .Where(x =>
-//                x != State.TurningOn &&
-//                x != State.TurningOff
-//            )
-//            .Select(x => x.FromNative())
-//            .SubscribeAsync(status => this.Services.RunDelegates<IBleDelegate>(del => del.OnAdapterStateChanged(status)));
-//    }
 
 
 //    public IServiceProvider Services { get; }
@@ -121,10 +96,7 @@
 //        ) ?? false);
 
 
-//    public Peripheral GetDevice(BluetoothDevice btDevice) => this.devices.GetOrAdd(
-//        btDevice.Address!,
-//        x => new Peripheral(this, btDevice)
-//    );
+
 
 
 //    public IEnumerable<Peripheral> GetConnectedDevices()
@@ -150,63 +122,6 @@
 
 //    public IObservable<ScanResult> Scan(ScanConfig config) => Observable.Create<ScanResult>(ob =>
 //    {
-//        this.devices.Clear();
-
-//        this.callbacks = new LollipopScanCallback(
-//            sr =>
-//            {
-//                var scanResult = this.ToScanResult(sr.Device!, sr.Rssi, new AdvertisementData(sr));
-//                ob.OnNext(scanResult);
-//            },
-//            errorCode => ob.OnError(new BleException("Error during scan: " + errorCode.ToString()))
-//        );
-
-//        AndroidScanConfig cfg = null!;
-//        if (config == null)
-//            cfg = new();
-//        else if (config is AndroidScanConfig cfg1)
-//            cfg = cfg1;
-//        else
-//            cfg = new AndroidScanConfig(ServiceUuids: config.ServiceUuids);
-        
-//        var builder = new ScanSettings.Builder();
-//        builder.SetScanMode(cfg.ScanMode);
-
-//        var scanFilters = new List<ScanFilter>();
-//        if (cfg.ServiceUuids.Length > 0)
-//        {
-//            foreach (var uuid in cfg.ServiceUuids)
-//            {
-//                var fullUuid = Utils.ToUuidType(uuid);
-//                var parcel = new ParcelUuid(fullUuid);
-//                scanFilters.Add(new ScanFilter.Builder()
-//                    .SetServiceUuid(parcel)
-//                    .Build()
-//                );
-//            }
-//        }
-
-//        if (cfg.UseScanBatching && this.Manager.Adapter!.IsOffloadedScanBatchingSupported)
-//            builder.SetReportDelay(100);
-
-//        this.Manager.Adapter!.BluetoothLeScanner!.StartScan(
-//            scanFilters,
-//            builder.Build(),
-//            this.callbacks
-//        );
-
-//        return () => this.Manager.Adapter.BluetoothLeScanner?.StopScan(this.callbacks);
-//    });
-
-
-//    public void StopScan()
-//    {
-//        if (this.callbacks == null)
-//            return;
-
-//        this.Manager.Adapter!.BluetoothLeScanner?.StopScan(this.callbacks);
-//        this.callbacks = null;
-//    }
 
 
 //    protected ScanResult ToScanResult(BluetoothDevice native, int rssi, IAdvertisementData ad)

@@ -1,5 +1,4 @@
-﻿using System.Reactive.Disposables;
-using Shiny.Locations;
+﻿using Shiny.Locations;
 
 namespace Sample.Gps;
 
@@ -32,7 +31,6 @@ public class GpsViewModel : ViewModel
             GpsAccuracy.Low.ToString(),
             GpsAccuracy.Lowest.ToString()
         };
-
         this.ToggleUpdates = new Command(
             async () =>
             {

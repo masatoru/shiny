@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Reactive;
+using System.Reactive.Linq;
 using CoreBluetooth;
 using Foundation;
 
@@ -10,34 +12,29 @@ internal static class PlatformExtensions
     public static byte[]? ToByteArray(this CBDescriptor native) => (native.Value as NSData)?.ToArray();
 
 
-    //public static IObservable<Unit> WhenReady(this CBCentralManager manager) => Observable.Create<Unit>(ob =>
-    //{
-    //    var context = manager.Delegate as ManagerContext;
-    //    if (context == null)
-    //        throw new ArgumentException("CBCentralManager.Delegate is not CentralContext");
+    public static IObservable<Unit> WhenReady(this CBCentralManager manager) => Observable.Create<Unit>(ob =>    
+        manager
+            .WhenStatusChanged()
+            .Subscribe(x =>
+            {
+                if (x == AccessState.Available)
+                    ob.Respond(Unit.Default);
+                else
+                    ob.OnError(new InvalidOperationException("Invalid Adapter State - " + x));
+            })
+    );
 
-    //    return context
-    //        .StateUpdated
-    //        .StartWith(manager.State.FromNative())
-    //        .Subscribe(state =>
-    //        {
-    //            switch (state)
-    //            {
-    //                case AccessState.Available:
-    //                    ob.Respond(Unit.Default);
-    //                    break;
 
-    //                case AccessState.Unknown:
-    //                    // not there yet, chill for a second
-    //                    break;
-
-    //                default:
-    //                    ob.OnError(new InvalidOperationException("Invalid Adapter State - " + state));
-    //                    break;
-    //            }
-    //        });
-    //});
-
+    public static IObservable<AccessState> WhenStatusChanged(this CBCentralManager manager) => Observable.Create<AccessState>(ob =>
+    {
+        var handler = new EventHandler((sender, args) =>
+        {
+            var state = manager.State.FromNative();
+            if (state != AccessState.Unknown)
+                ob.Respond(state);
+        });
+        return () => manager.UpdatedState -= handler;
+    });
 
 #if XAMARIN
     public static bool IsUnknown(this CBCentralManagerState state)

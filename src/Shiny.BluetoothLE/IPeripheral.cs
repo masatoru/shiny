@@ -33,14 +33,14 @@ public interface IPeripheral
     /// </summary>
     /// <param name="serviceUuid"></param>
     /// <returns></returns>
-    Task<IGattService> GetService(string serviceUuid);
+    Task<IGattService?> GetService(string serviceUuid);
 
     /// <summary>
     /// 
     /// </summary>
     /// <param name="refresh"></param>
     /// <returns></returns>
-    Task GetServices(bool refresh);
+    Task<IList<IGattService>?> GetServices(bool refresh);
 
     /// <summary>
     /// Connect to a peripheral
@@ -48,24 +48,10 @@ public interface IPeripheral
     /// <param name="config">Connection configuration</param>
     void Connect(ConnectionConfig? config = null);
 
-
     /// <summary>
     /// Disconnect from the peripheral and cancel persistent connection
     /// </summary>
     void CancelConnection();
-
-
-    /// <summary>
-    /// Monitor connection status
-    /// </summary>
-    /// <returns></returns>
-    IObservable<ConnectionState> WhenStatusChanged();
-
-        /// <summary>
-    /// Monitor peripheral name changes
-    /// </summary>
-    /// <returns></returns>
-    IObservable<string> WhenNameUpdated();
 
     /// <summary>
     /// This is the current MTU size (must be connected to get a true value)

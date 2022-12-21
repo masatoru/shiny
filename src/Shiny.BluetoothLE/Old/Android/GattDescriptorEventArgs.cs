@@ -1,16 +1,16 @@
-using System;
-using Android.Bluetooth;
+//using System;
+//using Android.Bluetooth;
 
-namespace Shiny.BluetoothLE.Internals;
-
-
-public class GattDescriptorEventArgs : GattEventArgs
-{
-    public BluetoothGattDescriptor Descriptor { get; }
+//namespace Shiny.BluetoothLE.Internals;
 
 
-    public GattDescriptorEventArgs(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, GattStatus status) : base(gatt, status)
-    {
-        this.Descriptor = descriptor;
-    }
-}
+//public class GattDescriptorEventArgs : GattEventArgs
+//{
+//    public BluetoothGattDescriptor Descriptor { get; }
+
+
+//    public GattDescriptorEventArgs(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, GattStatus status) : base(gatt, status)
+//    {
+//        this.Descriptor = descriptor;
+//    }
+//}

@@ -1,19 +1,19 @@
-using System;
-using Android.Bluetooth;
+//using System;
+//using Android.Bluetooth;
 
-namespace Shiny.BluetoothLE.Internals;
-
-
-public class GattEventArgs : EventArgs
-{
-    public GattEventArgs(BluetoothGatt gatt, GattStatus status)
-    {
-        this.Gatt = gatt;
-        this.Status = status;
-    }
+//namespace Shiny.BluetoothLE.Internals;
 
 
-    public BluetoothGatt Gatt { get;  }
-    public GattStatus Status { get; }
-    public bool IsSuccessful => this.Status == GattStatus.Success;
-}
+//public class GattEventArgs : EventArgs
+//{
+//    public GattEventArgs(BluetoothGatt gatt, GattStatus status)
+//    {
+//        this.Gatt = gatt;
+//        this.Status = status;
+//    }
+
+
+//    public BluetoothGatt Gatt { get;  }
+//    public GattStatus Status { get; }
+//    public bool IsSuccessful => this.Status == GattStatus.Success;
+//}

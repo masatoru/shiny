@@ -113,8 +113,7 @@
 //    {
 //        try
 //        {
-//            this.Gatt?.Close();
-//            this.Gatt = null;
+
 //        }
 //        catch (Exception ex)
 //        {

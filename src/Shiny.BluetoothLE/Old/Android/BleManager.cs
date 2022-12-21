@@ -52,23 +52,7 @@
 //        );
 
 
-//    public override IObservable<AccessState> RequestAccess() => Observable.FromAsync(async ct =>
-//    {
-//        var versionPermissions = GetPlatformPermissions();
 
-//        if (!versionPermissions.All(x => this.context.Android.IsInManifest(x)))
-//            return AccessState.NotSetup;
-
-//        var results = await this.context
-//            .Android
-//            .RequestPermissions(versionPermissions)
-//            .ToTask(ct)
-//            .ConfigureAwait(false);
-
-//        return results.IsSuccess()
-//            ? this.context.Status // now look at the actual device state
-//            : AccessState.Denied;
-//    });
 
 
 //    public override IObservable<ScanResult> Scan(ScanConfig? config = null)
@@ -104,26 +88,7 @@
 //    );
 
 
-//    static string[] GetPlatformPermissions()
-//    {
-//        var list = new List<string>();
 
-//        if (OperatingSystemShim.IsAndroidVersionAtLeast(31))
-//        { 
-//            return new[]
-//            {
-//                Manifest.Permission.BluetoothScan,
-//                Manifest.Permission.BluetoothConnect
-//            };
-//        }
-//        return new[]
-//        {
-//            Manifest.Permission.Bluetooth,
-//            Manifest.Permission.BluetoothPrivileged,
-//            Manifest.Permission.BluetoothAdmin,
-//            Manifest.Permission.AccessFineLocation
-//        };
-//    }
 
 
 //    static void Assert(AccessState access)

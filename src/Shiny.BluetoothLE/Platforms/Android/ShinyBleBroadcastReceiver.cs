@@ -2,7 +2,7 @@
 using System.Reactive.Subjects;
 using Android.Content;
 
-namespace Shiny.BluetoothLE.Internals;
+namespace Shiny.BluetoothLE;
 
 
 [BroadcastReceiver(
@@ -14,7 +14,7 @@ public class ShinyBleBroadcastReceiver : BroadcastReceiver
 {
     public const string Name = "com.shiny.bluetoothle.ShinyBleCentralBroadcastReceiver";
 
-    static readonly Subject<Intent> bleSubj = new Subject<Intent>();
+    static readonly Subject<Intent> bleSubj = new();
     public static IObservable<Intent> WhenBleEvent() => bleSubj;
 
 

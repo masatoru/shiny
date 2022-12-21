@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Reactive.Threading.Tasks;
 using System.Threading.Tasks;
 using CoreBluetooth;
 using Foundation;
+using Microsoft.Extensions.Logging;
 
 namespace Shiny.BluetoothLE;
 
@@ -12,45 +14,44 @@ public class BleManager : CBCentralManagerDelegate, IBleManager
 {
     readonly AppleBleConfiguration config;
     readonly IServiceProvider services;
+    readonly ILogger logger;
 
 
-    public BleManager(AppleBleConfiguration config, IServiceProvider services)
+    public BleManager(
+        AppleBleConfiguration config,
+        IServiceProvider services,
+        ILogger<BleManager> logger
+    )
     {
         this.config = config;
         this.services = services;
+        this.logger = logger;
     }
 
-
+    //BindingBase.EnableCollectionSynchronization()
     readonly ObservableList<IPeripheral> connected = new();
     public INotifyReadOnlyCollection<IPeripheral> ConnectedPeripherals => this.connected;
 
     readonly ObservableList<ScanResult> scanResults = new();
     public INotifyReadOnlyCollection<ScanResult> ScanResults => this.scanResults;
 
-
     public bool IsScanning { get; private set; }
 
 
-    public Task<AccessState> RequestAccess() => throw new NotImplementedException();
+    public async Task<AccessState> RequestAccess()
+    {
+        var manager = this.CreateManager();
+        var state = manager.State.FromNative();
 
-
-    //            if (!AppleExtensions.HasPlistValue("NSBluetoothPeripheralUsageDescription"))
-    //                this.logger.LogCritical("NSBluetoothPeripheralUsageDescription needs to be set - you will likely experience a native crash after this log");
-
-    //            if (!AppleExtensions.HasPlistValue("NSBluetoothAlwaysUsageDescription", 13))
-    //                this.logger.LogCritical("NSBluetoothAlwaysUsageDescription needs to be set - you will likely experience a native crash after this log");
-
-    //            var background = services.GetService(typeof(IBleDelegate)) != null;
-    //            if (!background)
-    //                return new CBCentralManager(this, null);
-
-    //            var opts = new CBCentralInitOptions
-    //            {
-    //                ShowPowerAlert = config.ShowPowerAlert,
-    //                RestoreIdentifier = config.RestoreIdentifier ?? "shinyble"
-    //            };
-
-    //            return new CBCentralManager(this, null, opts);
+        if (state == AccessState.Unknown)
+        {
+            state = await manager
+                .WhenStatusChanged()
+                .ToTask()
+                .ConfigureAwait(false);
+        }
+        return state;
+    }
 
 
     CBCentralManager? currentManager;
@@ -65,11 +66,8 @@ public class BleManager : CBCentralManagerDelegate, IBleManager
         config ??= new ScanConfig();
         (await this.RequestAccess()).Assert();
 
-        // TODO: wait for WhenReady
-        this.currentManager = new CBCentralManager(
-            this,
-            null
-        );
+        this.currentManager = this.CreateManager();
+        await this.currentManager.WhenReady().ToTask().ConfigureAwait(false);
 
         if (config.ServiceUuids == null || config.ServiceUuids.Length == 0)
         {
@@ -101,37 +99,38 @@ public class BleManager : CBCentralManagerDelegate, IBleManager
         var result = this.scanResults.FirstOrDefault(x => x.Uuid.Equals(uuid, StringComparison.CurrentCultureIgnoreCase));
         if (result == null)
         {
-            result = new ScanResult(this.GetPeripheral(central, peripheral));
+            result = new ScanResult(new Peripheral(central, peripheral));
             this.scanResults.Add(result);
         }
 
         result.Rssi = RSSI.Int32Value;
-        //result.IsConnectable = 
-        //new AdvertisementData(advertisementData)
-   }
+        result.IsConnectable = Get(advertisementData, CBAdvertisement.IsConnectable, x => ((NSNumber)x).Int16Value == 1);
+        result.LocalName = Get(advertisementData, CBAdvertisement.DataLocalNameKey, x => x.ToString());
+        result.TxPower = Get(advertisementData, CBAdvertisement.DataTxPowerLevelKey, x => Convert.ToInt32(((NSNumber)x).Int16Value));
+    }
 
 
     public override async void ConnectionEventDidOccur(CBCentralManager central, CBConnectionEvent connectionEvent, CBPeripheral peripheral)
     {
-        var shinyPeripheral = this.GetPeripheral(central, peripheral);
-        // get from collection, change state, fire delegate
-        // what if not in collection?  :X - build new item?
-
         // TODO: thread safety
         if (connectionEvent == CBConnectionEvent.Connected)
         {
-            // add to collection
-            this.connected.Add(shinyPeripheral);
+            //this.scanResults.FirstOrDefault(x => x.)
+                // if not found, create
+            //var shinyPeripheral = new Peripheral(central, peripheral);
+            //this.connected.Add(shinyPeripheral);
         }
         else
         {
-            // remove from collection
-            this.connected.Remove(shinyPeripheral);
+            // by id
+            this.connected.Remove(null);
         }
 
-        await this.services
-            .RunDelegates<IBleDelegate>(x => x.OnPeripheralStateChanged(shinyPeripheral))
-            .ConfigureAwait(false);
+        //await this.services
+        //    .RunDelegates<IBleDelegate>(
+        //        x => x.OnPeripheralStateChanged(shinyPeripheral)
+        //    )
+        //    .ConfigureAwait(false);
     }
 
 
@@ -146,19 +145,90 @@ public class BleManager : CBCentralManagerDelegate, IBleManager
             var item = peripheralArray.GetItem<CBPeripheral>(i);
             if (item != null)
             {
-                var peripheral = this.GetPeripheral(central, item);
+                var peripheral = new Peripheral(central, item);
+                this.connected.Add(peripheral);
+
                 await this.services
                     .RunDelegates<IBleDelegate>(x => x.OnPeripheralStateChanged(peripheral))
                     .ConfigureAwait(false);
             }
         }
-        // TODO: restore scan? CBCentralManager.RestoredStateScanOptionsKey
+        // restore scan? CBCentralManager.RestoredStateScanOptionsKey
     }
 
 
-    readonly ConcurrentDictionary<string, IPeripheral> peripherals = new();
-    IPeripheral GetPeripheral(CBCentralManager central, CBPeripheral peripheral) => this.peripherals.GetOrAdd(
-        peripheral.Identifier.ToString(),
-        x => new Peripheral(central, peripheral)
-    );
+    static T? Get<T>(NSDictionary adData, NSString key, Func<NSObject, T> transform)
+    {
+        if (adData == null)
+            return default;
+
+        if (!adData.ContainsKey(key))
+            return default;
+
+        var obj = adData.ObjectForKey(key);
+        if (obj == null)
+            return default;
+
+        var result = transform(obj);
+        return result;
+    }
+
+
+    CBCentralManager CreateManager()
+    {
+        if (!AppleExtensions.HasPlistValue("NSBluetoothPeripheralUsageDescription"))
+            this.logger.LogCritical("NSBluetoothPeripheralUsageDescription needs to be set - you will likely experience a native crash after this log");
+
+        var background = this.services.GetService(typeof(IBleDelegate)) != null;
+        if (!background)
+            return new CBCentralManager(this, null);
+
+        if (!AppleExtensions.HasPlistValue("NSBluetoothAlwaysUsageDescription", 13))
+            this.logger.LogCritical("NSBluetoothAlwaysUsageDescription needs to be set - you will likely experience a native crash after this log");
+
+        var opts = new CBCentralInitOptions
+        {
+            ShowPowerAlert = this.config.ShowPowerAlert,
+            RestoreIdentifier = this.config.RestoreIdentifier ?? "shinyble"
+        };
+
+        return new CBCentralManager(this, null, opts);
+    }
 }
+
+//    this.manufacturerData = this.GetLazy(CBAdvertisement.DataManufacturerDataKey, x =>
+//    {
+//        var data = ((NSData)x).ToArray();
+//        var companyId = ((data[1] & 0xFF) << 8) + (data[0] & 0xFF);
+//        var value = new byte[data.Length - 2];
+//        Array.Copy(data, 2, value, 0, data.Length - 2);
+
+//        return new ManufacturerData((ushort)companyId, value);
+//    });
+//    this.serviceData = this.GetLazy(CBAdvertisement.DataServiceDataKey, item =>
+//    {
+//        var data = (NSDictionary)item;
+//        var list = new List<AdvertisementServiceData>();
+
+//        foreach (CBUUID key in data.Keys)
+//        {
+//            var rawKey = key.Data.ToArray();
+//            Array.Reverse(rawKey);
+
+//            var rawValue = ((NSData)data.ObjectForKey(key)).ToArray();
+//            list.Add(new AdvertisementServiceData(key.ToString(), rawValue));
+//        }
+//        return list.ToArray();
+//    });
+//    this.serviceUuids = this.GetLazy(CBAdvertisement.DataServiceUUIDsKey, x =>
+//    {
+//        var array = (NSArray)x;
+//        var list = new List<string>();
+//        for (nuint i = 0; i < array.Count; i++)
+//        {
+//            var uuid = array.GetItem<CBUUID>(i).ToString();
+//            list.Add(uuid);
+//        }
+//        return list.ToArray();
+//    });
+//}
