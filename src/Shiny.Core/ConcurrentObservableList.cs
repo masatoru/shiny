@@ -93,6 +93,7 @@ public class ConcurrentObservableList<T> : INotifyCollectionChanged<T>
             return this.list.GetEnumerator();
     }
 
+
     public int IndexOf(T item)
     {
         lock (this.list)

@@ -1,20 +1,20 @@
-﻿//using Android.Bluetooth.LE;
+﻿using Android.Bluetooth.LE;
 
-//namespace Shiny.BluetoothLE;
-
-
-//public record AndroidScanConfig(
-//    ScanMode ScanMode = ScanMode.Balanced,
+namespace Shiny.BluetoothLE;
 
 
-//    /// <summary>
-//    /// Allows the use of Scan Batching, if supported by the underlying provider
-//    /// Currently, this only affects Android peripherals
-//    /// It defaults to false to be transparent/non-breaking with existing code
-//    /// </summary>
-//    bool UseScanBatching = false,
+public record AndroidScanConfig(
+    ScanMode ScanMode = ScanMode.Balanced,
 
-//    params string[] ServiceUuids
-//) : ScanConfig(
-//    ServiceUuids
-//);
+
+    /// <summary>
+    /// Allows the use of Scan Batching, if supported by the underlying provider
+    /// Currently, this only affects Android peripherals
+    /// It defaults to false to be transparent/non-breaking with existing code
+    /// </summary>
+    bool UseScanBatching = false,
+
+    params string[] ServiceUuids
+) : ScanConfig(
+    ServiceUuids
+);

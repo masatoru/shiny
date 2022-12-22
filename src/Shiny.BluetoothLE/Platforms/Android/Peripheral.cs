@@ -17,7 +17,7 @@ public class Peripheral : BluetoothGattCallback, IPeripheral
 
 
     public Peripheral(
-        ILogger<Peripheral> logger,
+        ILogger logger,
         BleManager manager,
         BluetoothDevice native
     )

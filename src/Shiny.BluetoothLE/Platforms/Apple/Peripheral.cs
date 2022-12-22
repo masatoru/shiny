@@ -3,18 +3,25 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using CoreBluetooth;
 using Foundation;
+using Microsoft.Extensions.Logging;
 
 namespace Shiny.BluetoothLE;
 
 
 public class Peripheral : CBPeripheralDelegate, IPeripheral
 {
+    readonly ILogger logger;
     readonly CBCentralManager manager;
     readonly CBPeripheral peripheral;
     
 
-    public Peripheral(CBCentralManager manager, CBPeripheral peripheral)
+    public Peripheral(
+        ILogger logger,
+        CBCentralManager manager,
+        CBPeripheral peripheral
+    )
     {
+        this.logger = logger;
         this.manager = manager;
         this.peripheral = peripheral;
 
@@ -26,8 +33,6 @@ public class Peripheral : CBPeripheralDelegate, IPeripheral
 
     public string Uuid { get; }
     public string? Name { get; private set; }
-
-
     public ConnectionState Status => this.peripheral.State switch
     {
         CBPeripheralState.Connected => ConnectionState.Connected,

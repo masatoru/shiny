@@ -17,20 +17,18 @@ public static class BleManagerExtensions
         //if (config?.ScanServiceUuids?.Any() ?? false)
         //    cfg.ServiceUuids = config.ScanServiceUuids;
 
-        return manager
-            .Scan(new AndroidScanConfig(scanMode))
-            .Where(x => x.IsBeacon())
-            .Select(x => x.AdvertisementData.ManufacturerData!.Data.Parse(x.Rssi));
+        // TODO
+        return null;
+        //return Observable
+        //    .FromAsync(() => manager.StartScan(new AndroidScanConfig(scanMode))
+        //    .Select(_ => manager.ScanResults.)
+            //.Select()
+            //.Scan(new AndroidScanConfig(scanMode))
+            //.Where(x => x.IsBeacon())
+            //.Select(x => x.AdvertisementData.ManufacturerData!.Data.Parse(x.Rssi));
     }
 
 
     public static bool IsBeacon(this ScanResult result)
-    {
-        var md = result.AdvertisementData?.ManufacturerData;
-
-        if (md?.Data == null)
-            return false;
-
-        return md.Data.IsBeaconPacket();
-    }
+        => result?.ManufacturerData?.Data.IsBeaconPacket() ?? false;
 }

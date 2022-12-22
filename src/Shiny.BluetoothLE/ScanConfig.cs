@@ -5,10 +5,10 @@ namespace Shiny.BluetoothLE;
 
 
 public record ScanConfig(
-    Func<ScanResult, bool>? predicate = null,
-    IScheduler? scheduler = null,
-    TimeSpan? bufferTime = null,
-    TimeSpan? clearTime = null,
+    //Func<ScanResult, bool>? predicate = null,
+    //IScheduler? scheduler = null,
+    //TimeSpan? bufferTime = null,
+    //TimeSpan? clearTime = null,
 
     /// <summary>
     /// Filters scan to peripherals that advertise specified service UUIDs

@@ -50,7 +50,6 @@ public partial class BeaconMonitoringManager : IBeaconMonitoringManager, IShinyS
 #if ANDROID
         await this.bleManager
             .RequestAccess()
-            .ToTask()
             .ConfigureAwait(false);
 #endif
         this.repository.Set(region);
@@ -86,7 +85,6 @@ public partial class BeaconMonitoringManager : IBeaconMonitoringManager, IShinyS
 #if ANDROID
         var access = await this.bleManager
             .RequestAccess()
-            .ToTask()
             .ConfigureAwait(false);
 
         await this.platform.RequestLocationAccess(LocationPermissionType.Fine);

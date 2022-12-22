@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Threading.Tasks;
 using System.Threading.Tasks;
@@ -14,21 +14,24 @@ public class BleManager : CBCentralManagerDelegate, IBleManager
 {
     readonly AppleBleConfiguration config;
     readonly IServiceProvider services;
+    readonly ILogger peripheralLogger;
     readonly ILogger logger;
 
 
     public BleManager(
         AppleBleConfiguration config,
         IServiceProvider services,
+        ILogger<Peripheral> peripheralLogger,
         ILogger<BleManager> logger
     )
     {
         this.config = config;
         this.services = services;
+        this.peripheralLogger = peripheralLogger;
         this.logger = logger;
     }
 
-    //BindingBase.EnableCollectionSynchronization()
+
     readonly ObservableList<IPeripheral> connected = new();
     public INotifyReadOnlyCollection<IPeripheral> ConnectedPeripherals => this.connected;
 
@@ -99,7 +102,7 @@ public class BleManager : CBCentralManagerDelegate, IBleManager
         var result = this.scanResults.FirstOrDefault(x => x.Uuid.Equals(uuid, StringComparison.CurrentCultureIgnoreCase));
         if (result == null)
         {
-            result = new ScanResult(new Peripheral(central, peripheral));
+            result = new ScanResult(new Peripheral(this.peripheralLogger, central, peripheral));
             this.scanResults.Add(result);
         }
 
@@ -107,30 +110,77 @@ public class BleManager : CBCentralManagerDelegate, IBleManager
         result.IsConnectable = Get(advertisementData, CBAdvertisement.IsConnectable, x => ((NSNumber)x).Int16Value == 1);
         result.LocalName = Get(advertisementData, CBAdvertisement.DataLocalNameKey, x => x.ToString());
         result.TxPower = Get(advertisementData, CBAdvertisement.DataTxPowerLevelKey, x => Convert.ToInt32(((NSNumber)x).Int16Value));
+
+        result.ManufacturerData = Get(advertisementData, CBAdvertisement.DataManufacturerDataKey, x =>
+        {
+            var data = ((NSData)x).ToArray();
+            var companyId = ((data[1] & 0xFF) << 8) + (data[0] & 0xFF);
+            var value = new byte[data.Length - 2];
+            Array.Copy(data, 2, value, 0, data.Length - 2);
+
+            return new ManufacturerData((ushort)companyId, value);
+        });
+        result.ServiceData = Get(advertisementData, CBAdvertisement.DataServiceDataKey, item =>
+        {
+            var data = (NSDictionary)item;
+            var list = new List<AdvertisementServiceData>();
+
+            foreach (CBUUID key in data.Keys)
+            {
+                var rawKey = key.Data.ToArray();
+                Array.Reverse(rawKey);
+
+                var rawValue = ((NSData)data.ObjectForKey(key)).ToArray();
+                list.Add(new AdvertisementServiceData(key.ToString(), rawValue));
+            }
+            return list.ToArray();
+        });
+        result.ServiceUuids = Get(advertisementData, CBAdvertisement.DataServiceUUIDsKey, x =>
+        {
+            var array = (NSArray)x;
+            var list = new List<string>();
+            for (nuint i = 0; i < array.Count; i++)
+            {
+                var uuid = array.GetItem<CBUUID>(i).ToString();
+                list.Add(uuid);
+            }
+            return list.ToArray();
+        });
     }
 
 
     public override async void ConnectionEventDidOccur(CBCentralManager central, CBConnectionEvent connectionEvent, CBPeripheral peripheral)
     {
-        // TODO: thread safety
+        var uuid = peripheral.Identifier.ToString();
+        this.logger.LogInformation($"Peripheral '{uuid}' status change to {connectionEvent}");
+        IPeripheral? shinyPeripheral = null;
+
         if (connectionEvent == CBConnectionEvent.Connected)
         {
-            //this.scanResults.FirstOrDefault(x => x.)
-                // if not found, create
-            //var shinyPeripheral = new Peripheral(central, peripheral);
-            //this.connected.Add(shinyPeripheral);
+            var result = this.scanResults.FirstOrDefault(x => x.Uuid.Equals(uuid, StringComparison.CurrentCultureIgnoreCase));
+            shinyPeripheral = result == null
+                ? new Peripheral(this.peripheralLogger, central, peripheral)
+                : result.Peripheral;
+
+            this.connected.Add(shinyPeripheral);
         }
         else
         {
-            // by id
-            this.connected.Remove(null);
+            var item = this.connected.FirstOrDefault(x => x.Uuid.Equals(uuid));
+            if (item != null)
+            {
+                shinyPeripheral = item;
+                this.connected.Remove(item);
+            }
         }
-
-        //await this.services
-        //    .RunDelegates<IBleDelegate>(
-        //        x => x.OnPeripheralStateChanged(shinyPeripheral)
-        //    )
-        //    .ConfigureAwait(false);
+        if (shinyPeripheral != null)
+        {
+            await this.services
+                .RunDelegates<IBleDelegate>(
+                    x => x.OnPeripheralStateChanged(shinyPeripheral)
+                )
+                .ConfigureAwait(false);
+        }
     }
 
 
@@ -145,7 +195,7 @@ public class BleManager : CBCentralManagerDelegate, IBleManager
             var item = peripheralArray.GetItem<CBPeripheral>(i);
             if (item != null)
             {
-                var peripheral = new Peripheral(central, item);
+                var peripheral = new Peripheral(this.peripheralLogger, central, item);
                 this.connected.Add(peripheral);
 
                 await this.services
@@ -195,40 +245,3 @@ public class BleManager : CBCentralManagerDelegate, IBleManager
         return new CBCentralManager(this, null, opts);
     }
 }
-
-//    this.manufacturerData = this.GetLazy(CBAdvertisement.DataManufacturerDataKey, x =>
-//    {
-//        var data = ((NSData)x).ToArray();
-//        var companyId = ((data[1] & 0xFF) << 8) + (data[0] & 0xFF);
-//        var value = new byte[data.Length - 2];
-//        Array.Copy(data, 2, value, 0, data.Length - 2);
-
-//        return new ManufacturerData((ushort)companyId, value);
-//    });
-//    this.serviceData = this.GetLazy(CBAdvertisement.DataServiceDataKey, item =>
-//    {
-//        var data = (NSDictionary)item;
-//        var list = new List<AdvertisementServiceData>();
-
-//        foreach (CBUUID key in data.Keys)
-//        {
-//            var rawKey = key.Data.ToArray();
-//            Array.Reverse(rawKey);
-
-//            var rawValue = ((NSData)data.ObjectForKey(key)).ToArray();
-//            list.Add(new AdvertisementServiceData(key.ToString(), rawValue));
-//        }
-//        return list.ToArray();
-//    });
-//    this.serviceUuids = this.GetLazy(CBAdvertisement.DataServiceUUIDsKey, x =>
-//    {
-//        var array = (NSArray)x;
-//        var list = new List<string>();
-//        for (nuint i = 0; i < array.Count; i++)
-//        {
-//            var uuid = array.GetItem<CBUUID>(i).ToString();
-//            list.Add(uuid);
-//        }
-//        return list.ToArray();
-//    });
-//}

@@ -15,6 +15,10 @@ public interface IBleManager
     /// </summary>
     INotifyReadOnlyCollection<ScanResult> ScanResults { get; }
 
+#if ANDROID
+    Task StartScan(AndroidScanConfig? config = null);
+#endif
+
     /// <summary>
     /// 
     /// </summary>
@@ -36,5 +40,4 @@ public interface IBleManager
     /// </summary>
     /// <returns></returns>
     Task<AccessState> RequestAccess();
-
 }

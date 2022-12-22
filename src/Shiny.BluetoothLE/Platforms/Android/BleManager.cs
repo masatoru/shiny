@@ -18,16 +18,19 @@ namespace Shiny.BluetoothLE;
 public class BleManager : ScanCallback, IBleManager, IShinyStartupTask
 {
     readonly AndroidPlatform platform;
+    readonly ILogger peripheralLogger;
     readonly ILogger logger;
 
 
     public BleManager(
         AndroidPlatform platform,
+        ILogger<Peripheral> peripheralLogger,
         ILogger<BleManager> logger
     )
-    {
-        this.logger = logger;
+    {        
         this.platform = platform;
+        this.peripheralLogger = peripheralLogger;
+        this.logger = logger;
     }
 
 
@@ -59,10 +62,10 @@ public class BleManager : ScanCallback, IBleManager, IShinyStartupTask
     }
 
 
-    readonly ObservableList<IPeripheral> peripherals = new();
+    readonly ConcurrentObservableList<IPeripheral> peripherals = new();
     public INotifyReadOnlyCollection<IPeripheral> ConnectedPeripherals => this.peripherals;
 
-    readonly ObservableList<ScanResult> scanResults = new();
+    readonly ConcurrentObservableList<ScanResult> scanResults = new();
     public INotifyReadOnlyCollection<ScanResult> ScanResults => this.scanResults;
 
     public BluetoothManager NativeManager
@@ -92,31 +95,31 @@ public class BleManager : ScanCallback, IBleManager, IShinyStartupTask
     public bool IsScanning { get; private set; }
 
 
-    public async Task StartScan(ScanConfig? config = null)
+    public async Task StartScan(AndroidScanConfig? config = null)
     {
         if (this.IsScanning)
             throw new InvalidOperationException("There is already a scan in progress");
 
-        config ??= new ScanConfig();
+        config ??= new AndroidScanConfig();
         (await this.RequestAccess()).Assert();
 
         this.IsScanning = true;
         this.scanResults.Clear();
-        //AndroidScanConfig cfg = null!;
-        //        if (config == null)
-        //            cfg = new();
-        //        else if (config is AndroidScanConfig cfg1)
-        //            cfg = cfg1;
-        //        else
-        //            cfg = new AndroidScanConfig(ServiceUuids: config.ServiceUuids);
+        AndroidScanConfig cfg = null!;
+        if (config == null)
+            cfg = new();
+        else if (config is AndroidScanConfig cfg1)
+            cfg = cfg1;
+        else
+            cfg = new AndroidScanConfig(ServiceUuids: config.ServiceUuids);
 
         var builder = new ScanSettings.Builder();
-        //builder.SetScanMode(cfg.ScanMode);
+        builder.SetScanMode(cfg.ScanMode);
 
         var scanFilters = new List<ScanFilter>();
-        if (config.ServiceUuids.Length > 0)
+        if ((cfg.ServiceUuids?.Length ?? 0) > 0)
         {
-            foreach (var uuid in config.ServiceUuids)
+            foreach (var uuid in cfg.ServiceUuids!)
             {
                 var fullUuid = Utils.ToUuidType(uuid);
                 var parcel = new ParcelUuid(fullUuid);
@@ -128,12 +131,15 @@ public class BleManager : ScanCallback, IBleManager, IShinyStartupTask
             }
         }
 
-        //if (cfg.UseScanBatching && this.Manager.Adapter!.IsOffloadedScanBatchingSupported)
-        //    builder.SetReportDelay(100);
+        if (cfg.UseScanBatching && this.NativeManager.Adapter!.IsOffloadedScanBatchingSupported)
+            builder.SetReportDelay(100);
 
         this.NativeManager.Adapter!.BluetoothLeScanner!.StartScan(this);
     }
 
+
+    public Task StartScan(ScanConfig? config = null)
+        => this.StartScan(new AndroidScanConfig(Android.Bluetooth.LE.ScanMode.Balanced, false, config?.ServiceUuids!));
 
     public void StopScan()
     {
@@ -159,21 +165,27 @@ public class BleManager : ScanCallback, IBleManager, IShinyStartupTask
 
     void FindAndSet(SR result)
     {
-        //    public Peripheral GetDevice(BluetoothDevice btDevice) => this.devices.GetOrAdd(
-        //        btDevice.Address!,
-        //        x => new Peripheral(this, btDevice)
-        //    );
-        //    
-        //result.IsConnectable;
-        //result.ScanRecord.DeviceName;
-        //result.ScanRecord?.TxPowerLevel
+        var uuid = result.Device!.Address!;
+        var sr = this.scanResults.FirstOrDefault(x => x.Uuid.Equals(uuid));
+        if (sr == null)
+        {
+            sr = new ScanResult(
+                new Peripheral(this.peripheralLogger, this, result.Device)
+            );
+            this.scanResults.Add(sr);
+        }
+        sr.IsConnectable = result.IsConnectable;
+        sr.LocalName = result.ScanRecord?.DeviceName;
+        sr.TxPower = result.ScanRecord?.TxPowerLevel;
+
+        sr.ServiceData = GetServiceData(result);
+        sr.ServiceUuids = GetServiceUuids(result);
+        sr.ManufacturerData = GetManufacturerData(result);
     }
 
 
     static string[] GetPlatformPermissions()
     {
-        var list = new List<string>();
-
         if (OperatingSystemShim.IsAndroidVersionAtLeast(31))
         {
             return new[]
@@ -192,7 +204,7 @@ public class BleManager : ScanCallback, IBleManager, IShinyStartupTask
     }
 
 
-    static ManufacturerData? ToManufacturerData(SR result)
+    static ManufacturerData? GetManufacturerData(SR result)
     {
         var md = result.ScanRecord?.ManufacturerSpecificData;
         if (md == null || md.Size() == 0)

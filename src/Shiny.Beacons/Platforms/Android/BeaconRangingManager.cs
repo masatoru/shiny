@@ -17,13 +17,13 @@ public class BeaconRangingManager : IBeaconRangingManager
     {
         this.centralManager = centralManager;
         this.scanner = this.centralManager
-            .ScanForBeacons(true) // TODO
+            .ScanForBeacons(false)
             .Publish()
             .RefCount();
     }
 
 
-    public Task<AccessState> RequestAccess() => this.centralManager.RequestAccess().ToTask();
+    public Task<AccessState> RequestAccess() => this.centralManager.RequestAccess();
     public IObservable<Beacon> WhenBeaconRanged(BeaconRegion region)
         => this.scanner.Where(beacon => region.IsBeaconInRegion(beacon));
 }
