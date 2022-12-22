@@ -64,4 +64,9 @@
         <ProjectReference Include="..\..\src\Shiny.Notifications.Common\Shiny.Notifications.Common.csproj" />
         <ProjectReference Include="..\..\src\Shiny.Notifications\Shiny.Notifications.csproj" />        
     </ItemGroup>
+
+    <ItemGroup>
+        <Compile Exclude="Off\" />
+        <None Remove="Off\" />
+    </ItemGroup>
 </Project>
